@@ -106,7 +106,16 @@ def main():
                     if t and (time.time() - t) < 10:
                         st.error("🚨 **Fire detected!** — Alarm playing.")
                         if os.path.exists(alarm_path):
-                            st.audio(alarm_path, format="audio/mp3", autoplay=True, key="fire_alarm_auto")
+                            # Embed audio and force play via JS so alarm actually plays (st.audio autoplay is often blocked)
+                            with open(alarm_path, "rb") as f:
+                                b64 = __import__("base64").b64encode(f.read()).decode()
+                            audio_html = f'''<audio id="firealarm" preload="auto"><source src="data:audio/mp3;base64,{b64}" type="audio/mpeg"></audio><script>(function(){{var a=document.getElementById("firealarm");if(a){{a.volume=1;a.loop=true;a.play().catch(function(){{}});}}}})();</script>'''
+                            try:
+                                st.html(audio_html, unsafe_allow_javascript=True)
+                            except TypeError:
+                                st.components.v1.html(f'<audio autoplay loop><source src="data:audio/mp3;base64,{b64}" type="audio/mpeg"></audio>', height=0)
+                            st.audio(alarm_path, format="audio/mp3", key=f"fire_alarm_{int(t)}")
+                            st.caption("If no sound, tap **Play** above once (some browsers block auto-play until you tap).")
                         return
             except Exception:
                 pass
