@@ -33,8 +33,6 @@ def main():
     st.markdown("**Real-time** fire detection from your device camera. Works on phone and computer.")
 
     alarm_path = "assets/alarm.mp3"
-    if "live_fire_alert" not in st.session_state:
-        st.session_state.live_fire_alert = 0.0
 
     # Sidebar
     with st.sidebar:
@@ -58,7 +56,7 @@ def main():
         st.subheader("🔊 Alarm")
         if os.path.exists(alarm_path):
             st.audio(alarm_path, format="audio/mp3")
-            st.caption("Plays automatically when fire is detected below.")
+            st.caption("Plays automatically when fire is detected on camera.")
 
     detector = get_fire_detector()
     detector.detection_threshold = detection_threshold
@@ -71,11 +69,18 @@ def main():
         import av
         from streamlit_webrtc import webrtc_streamer
 
+        # Shared file so worker callback can signal "fire detected" to main app (alarm plays automatically)
+        _trigger_file = os.environ.get("FIRE_ALERT_TRIGGER_FILE", "/tmp/fire_alert_detected.txt")
+
         def video_frame_callback(frame):
             img = frame.to_ndarray(format="bgr24")
             fire_detected, annotated = run_detection(img, detector)
             if fire_detected:
-                st.session_state.live_fire_alert = time.time()
+                try:
+                    with open(_trigger_file, "w") as f:
+                        f.write(str(time.time()))
+                except Exception:
+                    pass
                 if email_config:
                     if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
                         detector.email_sender = email_config["sender"]
@@ -91,25 +96,24 @@ def main():
             rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         )
 
-        # Alert sound: fragment polls and shows alarm when fire was recently detected
-        @st.fragment(run_every=timedelta(seconds=2))
-        def fire_alert_sound():
-            t = st.session_state.get("live_fire_alert", 0.0)
-            if t and (time.time() - t) < 8:
-                st.error("🚨 **Fire detected!** — Alarm below.")
-                if os.path.exists(alarm_path):
-                    st.audio(alarm_path, format="audio/mp3", autoplay=True, key="fire_alarm_auto")
+        # Poll trigger file and play alarm automatically when fire was detected (callback runs in worker)
+        @st.fragment(run_every=timedelta(seconds=1))
+        def fire_alert_auto():
+            try:
+                if os.path.exists(_trigger_file):
+                    with open(_trigger_file, "r") as f:
+                        t = float(f.read().strip() or 0)
+                    if t and (time.time() - t) < 10:
+                        st.error("🚨 **Fire detected!** — Alarm playing.")
+                        if os.path.exists(alarm_path):
+                            st.audio(alarm_path, format="audio/mp3", autoplay=True, key="fire_alarm_auto")
+                        return
+            except Exception:
+                pass
+            if os.path.exists(alarm_path):
+                st.caption("Alarm will play automatically when fire is detected on the video.")
 
-        fire_alert_sound()
-
-        # Prominent alarm so user can tap if auto-play is blocked
-        st.divider()
-        st.subheader("🔊 Fire alarm")
-        if os.path.exists(alarm_path):
-            st.caption("If you see **Fire Detected!** on the video, tap below to play the alarm.")
-            st.audio(alarm_path, format="audio/mp3")
-        else:
-            st.warning("Alarm file not found: assets/alarm.mp3")
+        fire_alert_auto()
 
     except ImportError:
         st.info("Install: `pip install streamlit-webrtc av` then restart.")
