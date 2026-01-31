@@ -11,21 +11,21 @@ import os
 import threading
 
 class FireDetectionSystem:
-    def __init__(self):
+    def __init__(self, use_camera=True):
         # Initialize YOLO model
         print("Loading YOLO model...")
         self.model = YOLO('yolov8n.pt')
         
-        # Initialize camera with lower resolution for better performance
-        print("Initializing camera...")
-        self.cap = cv2.VideoCapture(0)
-        if not self.cap.isOpened():
-            raise RuntimeError("Failed to open camera")
-        
-        # Set camera properties for better performance
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        # Optional: initialize camera (skip for Streamlit image/upload mode)
+        self.cap = None
+        if use_camera:
+            print("Initializing camera...")
+            self.cap = cv2.VideoCapture(0)
+            if not self.cap.isOpened():
+                raise RuntimeError("Failed to open camera")
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+            self.cap.set(cv2.CAP_PROP_FPS, 30)
         
         # Detection settings
         self.detection_threshold = 0.3
@@ -35,9 +35,9 @@ class FireDetectionSystem:
         self.email_cooldown = 30  # Reduced to 30 seconds
         
         # Email settings
-        self.email_sender = "uptobreak2124@gmail.com"
-        self.email_password = "wqlo rpry ntii hwbw"
-        self.email_recipient = "techboy9489@gmail.com"
+        self.email_sender = "your_email@gmail.com"
+        self.email_password = "your_app_password"
+        self.email_recipient = "recipient@email.com"
         self.smtp_server = "smtp.gmail.com"
         self.smtp_port = 587
         
@@ -218,7 +218,8 @@ class FireDetectionSystem:
         except KeyboardInterrupt:
             print("\nStopping fire detection system...")
         finally:
-            self.cap.release()
+            if self.cap is not None:
+                self.cap.release()
             cv2.destroyAllWindows()
             print("System stopped")
 
