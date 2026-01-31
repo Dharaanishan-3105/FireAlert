@@ -10,7 +10,7 @@ This system uses computer vision and deep learning to detect fire in real-time f
 - Logging of detection events
 - Configurable detection threshold
 
-why FireAlert?
+## why FireAlert?
 
 This project aims to enhance safety through automated fire monitoring. The core features include:
 
