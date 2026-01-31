@@ -1,2 +1,1 @@
-# System libs for OpenCV on Streamlit Community Cloud (Debian)
 libgl1
