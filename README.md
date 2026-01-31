@@ -1,9 +1,9 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/FireAlert-🔥_Fire_Detection-ff6b35?style=for-the-badge&logo=firefox&logoColor=white" alt="FireAlert" />
-</p>
+<h1 align="center">
+  <span style="font-size: 3.5em; font-weight: 800; letter-spacing: -2px;">🔥 FireAlert</span>
+</h1>
 
 <p align="center">
-  <strong>Real-time fire detection using computer vision and deep learning</strong>
+  <strong style="font-size: 1.2em;">Real-time fire detection using computer vision and deep learning</strong>
 </p>
 
 <p align="center">
