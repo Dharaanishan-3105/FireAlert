@@ -64,31 +64,42 @@ def main():
     # Live camera only (real-time)
     st.subheader("Live camera detection")
     st.caption("Uses **your device camera** — works on phone and computer. Click **START** below and allow camera access.")
+    st.caption("_Alarm turns on only after sustained fire detection, and turns off only after sustained no-fire — reduces false alarms and flicker._")
 
     try:
         import av
         from streamlit_webrtc import webrtc_streamer
 
-        # Shared file so worker callback can signal "fire detected" to main app (alarm plays automatically)
+        # Shared file so worker callback can signal "fire detected" to main app
         _trigger_file = os.environ.get("FIRE_ALERT_TRIGGER_FILE", "/tmp/fire_alert_detected.txt")
+        # Debounce: only switch to FIRE after this many consecutive fire frames (reduces false alarms on person)
+        FIRE_DEBOUNCE_FRAMES = 10
+        # Debounce: only switch to NO FIRE after this many consecutive no-fire frames (alarm won't stop during brief gaps)
+        NO_FIRE_DEBOUNCE_FRAMES = 25
+        _debounce = {"fire_count": 0, "no_fire_count": 0}
 
         def video_frame_callback(frame):
             img = frame.to_ndarray(format="bgr24")
             fire_detected, annotated = run_detection(img, detector)
             try:
                 if fire_detected:
-                    with open(_trigger_file, "w") as f:
-                        f.write(str(time.time()))
-                    if email_config:
-                        if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
-                            detector.email_sender = email_config["sender"]
-                            detector.email_password = email_config["password"]
-                            detector.email_recipient = email_config["recipient"]
-                            detector.send_email_alert(annotated)
+                    _debounce["no_fire_count"] = 0
+                    _debounce["fire_count"] = _debounce["fire_count"] + 1
+                    if _debounce["fire_count"] >= FIRE_DEBOUNCE_FRAMES:
+                        with open(_trigger_file, "w") as f:
+                            f.write(str(time.time()))
+                        if email_config:
+                            if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
+                                detector.email_sender = email_config["sender"]
+                                detector.email_password = email_config["password"]
+                                detector.email_recipient = email_config["recipient"]
+                                detector.send_email_alert(annotated)
                 else:
-                    # No fire: clear trigger so main app stops the alarm
-                    if os.path.exists(_trigger_file):
-                        os.remove(_trigger_file)
+                    _debounce["fire_count"] = 0
+                    _debounce["no_fire_count"] = _debounce["no_fire_count"] + 1
+                    if _debounce["no_fire_count"] >= NO_FIRE_DEBOUNCE_FRAMES:
+                        if os.path.exists(_trigger_file):
+                            os.remove(_trigger_file)
             except Exception:
                 pass
             return av.VideoFrame.from_ndarray(annotated, format="bgr24")
@@ -100,14 +111,14 @@ def main():
             rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         )
 
-        # Poll trigger: play alarm only while fire is detected; stop as soon as no fire (prestigious, proper behavior)
+        # Poll trigger: play alarm only while fire; stop only after sustained no-fire (debounced in callback)
         @st.fragment(run_every=timedelta(seconds=1))
         def fire_alert_auto():
             try:
                 if os.path.exists(_trigger_file):
                     with open(_trigger_file, "r") as f:
                         t = float(f.read().strip() or 0)
-                    if t and (time.time() - t) < 15:
+                    if t and (time.time() - t) < 120:
                         st.error("🚨 **Fire detected!** — Alarm on.")
                         if os.path.exists(alarm_path):
                             with open(alarm_path, "rb") as f:
