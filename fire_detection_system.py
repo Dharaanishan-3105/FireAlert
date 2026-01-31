@@ -5,7 +5,13 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
-from playsound import playsound
+try:
+    from playsound import playsound
+except ImportError:
+    # playsound often fails on Linux/cloud (no desktop audio). Alarm still works:
+    # - Streamlit app: uses st.audio() so the browser plays the alert.
+    # - Local run: install with pip install playsound for system alarm.
+    playsound = None
 import time
 import os
 import threading
@@ -120,7 +126,9 @@ class FireDetectionSystem:
         return fire_detected, annotated_frame
     
     def play_alarm(self):
-        """Play alarm sound in a separate thread"""
+        """Play alarm sound in a separate thread (desktop/CLI). Alert is always available in Streamlit via st.audio()."""
+        if playsound is None:
+            return  # Use Streamlit app's st.audio() or install playsound for local run
         if not self.is_alarm_playing:
             self.is_alarm_playing = True
             try:

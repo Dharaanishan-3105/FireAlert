@@ -1,7 +1,9 @@
-opencv-python==4.8.0.76
-numpy==1.23.5
-ultralytics==8.0.196
-pillow==9.5.0
-playsound==1.3.0
-python-dotenv==1.0.0
-streamlit>=1.28.0 
+# Streamlit Cloud / server-friendly (no GUI, no desktop audio)
+opencv-python-headless>=4.8.0
+numpy>=1.23.0,<2.0.0
+ultralytics>=8.0.0
+pillow>=9.0.0
+python-dotenv>=1.0.0
+streamlit>=1.28.0
+
+# Optional for local run with alarm sound: pip install playsound
