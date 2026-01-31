@@ -120,6 +120,10 @@ python fire_detection_system.py
 
 Press **`q`** to quit. The system uses your default webcam.
 
+### Deploy on Streamlit Community Cloud
+
+The app keeps all features: **email alerts**, **fast fire detection**, and **sound alert** (the browser plays the alarm when fire is detected). If you see *Error installing requirements*, open **Manage App → Logs** and check the exact error; in **Advanced settings** you can try selecting **Python 3.11** and redeploy.
+
 ---
 
 ## 📦 System Requirements
