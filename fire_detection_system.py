@@ -103,11 +103,15 @@ class FireDetectionSystem:
                     cv2.putText(annotated_frame, "Fire (Color+Motion)", (x, y-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                     color_motion_fire = True
-        # YOLO detection
+        # YOLO detection (exclude person/human to avoid false fire on people)
         yolo_fire = False
+        COCO_PERSON_CLASS_ID = 0
         yolo_results = self.model(frame, conf=self.detection_threshold, verbose=False, device='cpu', imgsz=256)
         for result in yolo_results:
             for box in result.boxes:
+                cls_id = int(box.cls[0])
+                if cls_id == COCO_PERSON_CLASS_ID:
+                    continue  # Never treat person as fire (avoids false alarm on phone/self)
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 conf = float(box.conf[0])
                 cropped_mask = fire_mask[y1:y2, x1:x2]
