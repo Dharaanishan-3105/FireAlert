@@ -101,54 +101,34 @@ def main():
                 st.info("Upload an image or take a snapshot to analyze.")
 
     else:
-        # Live camera mode (runs for a set duration; Streamlit can't process Stop during loop)
+        # Live camera via browser (works on cloud, phone, and computer)
         st.subheader("Live camera detection")
-        run_seconds = st.sidebar.slider("Live run duration (seconds)", 5, 120, 30)
-        st.caption(f"Click **Start** to run detection for **{run_seconds}** seconds. Your webcam will be used.")
-        start_btn = st.button("Start live detection", type="primary")
-        if start_btn:
-            st.session_state.run_live = True
-        if st.session_state.get('run_live', False):
-            place = st.empty()
-            status_placeholder = st.empty()
-            progress = st.progress(0)
-            cap = cv2.VideoCapture(0)
-            if not cap.isOpened():
-                st.error("Could not open camera. Check permissions or try another device.")
-                st.session_state.run_live = False
-            else:
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-                start_time = time.time()
-                fire_count = 0
-                try:
-                    while (time.time() - start_time) < run_seconds:
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-                        fire_detected, annotated = run_detection(frame, detector)
-                        rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-                        place.image(rgb, use_container_width=True)
-                        elapsed = time.time() - start_time
-                        progress.progress(min(1.0, elapsed / run_seconds))
-                        if fire_detected:
-                            fire_count += 1
-                            status_placeholder.error("🚨 Fire detected!")
-                            if email_config:
-                                detector.email_sender = email_config["sender"]
-                                detector.email_password = email_config["password"]
-                                detector.email_recipient = email_config["recipient"]
-                                detector.send_email_alert(annotated)
-                        else:
-                            status_placeholder.success("No fire")
-                        time.sleep(0.05)
-                finally:
-                    cap.release()
-                    st.session_state.run_live = False
-                    progress.progress(1.0)
-                st.success(f"Live run finished. Fire alerts: {fire_count}. Click **Start** to run again.")
-        else:
-            st.info("Click **Start live detection** to use your webcam.")
+        st.caption("Uses **your device camera** in the browser — works on phone and computer. Click **START** below and allow camera access.")
+        try:
+            import av
+            from streamlit_webrtc import webrtc_streamer
+
+            def video_frame_callback(frame):
+                img = frame.to_ndarray(format="bgr24")
+                fire_detected, annotated = run_detection(img, detector)
+                if fire_detected and email_config:
+                    if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
+                        detector.email_sender = email_config["sender"]
+                        detector.email_password = email_config["password"]
+                        detector.email_recipient = email_config["recipient"]
+                        detector.send_email_alert(annotated)
+                return av.VideoFrame.from_ndarray(annotated, format="bgr24")
+
+            webrtc_streamer(
+                key="fire-live",
+                video_frame_callback=video_frame_callback,
+                media_stream_constraints={"video": True, "audio": False},
+                rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+            )
+            st.caption("Detection results appear on the video (boxes and **Fire Detected!**). Use the alarm in the sidebar for sound.")
+        except ImportError:
+            st.info("**Live camera** uses your browser’s camera (works on phone and computer). Install: `pip install streamlit-webrtc av` then restart.")
+            st.code("pip install streamlit-webrtc av", language="bash")
 
 if __name__ == "__main__":
     main()

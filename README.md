@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <a href="https://firealert-dharaanishan.streamlit.app/"><strong>▶️ Try the live app (phone & desktop)</strong></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/YOLOv8-Ultralytics-00d4aa?style=flat-square" alt="YOLOv8" />
   <img src="https://img.shields.io/badge/OpenCV-4.8-5c3ee8?style=flat-square&logo=opencv&logoColor=white" alt="OpenCV" />
