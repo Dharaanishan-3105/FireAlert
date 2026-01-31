@@ -72,10 +72,10 @@ def main():
 
         # Shared file so worker callback can signal "fire detected" to main app
         _trigger_file = os.environ.get("FIRE_ALERT_TRIGGER_FILE", "/tmp/fire_alert_detected.txt")
-        # Debounce: only switch to FIRE after this many consecutive fire frames (reduces false alarms on person)
-        FIRE_DEBOUNCE_FRAMES = 10
+        # Debounce: only switch to FIRE after this many consecutive fire frames (reduces false alarms)
+        FIRE_DEBOUNCE_FRAMES = 5
         # Debounce: only switch to NO FIRE after this many consecutive no-fire frames (alarm won't stop during brief gaps)
-        NO_FIRE_DEBOUNCE_FRAMES = 25
+        NO_FIRE_DEBOUNCE_FRAMES = 20
         _debounce = {"fire_count": 0, "no_fire_count": 0}
 
         def video_frame_callback(frame):
@@ -86,8 +86,11 @@ def main():
                     _debounce["no_fire_count"] = 0
                     _debounce["fire_count"] = _debounce["fire_count"] + 1
                     if _debounce["fire_count"] >= FIRE_DEBOUNCE_FRAMES:
-                        with open(_trigger_file, "w") as f:
-                            f.write(str(time.time()))
+                        try:
+                            with open(_trigger_file, "w") as f:
+                                f.write(str(time.time()))
+                        except Exception:
+                            pass
                         if email_config:
                             if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
                                 detector.email_sender = email_config["sender"]

@@ -95,10 +95,10 @@ class FireDetectionSystem:
         annotated_frame = frame.copy()
         for contour in contours:
             area = cv2.contourArea(contour)
-            if area > 300:  # Increased area threshold
+            if area > 200:  # Lower threshold so smaller flames are detected
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = float(w)/h if h > 0 else 0
-                if 0.2 < aspect_ratio < 1.2:  # Fire is usually taller than wide
+                if 0.15 < aspect_ratio < 1.5:  # Slightly wider range for flame shapes
                     cv2.rectangle(annotated_frame, (x, y), (x+w, y+h), (0, 165, 255), 2)
                     cv2.putText(annotated_frame, "Fire (Color+Motion)", (x, y-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
@@ -120,8 +120,9 @@ class FireDetectionSystem:
                     cv2.putText(annotated_frame, f"Fire: {conf:.2f}", (x1, y1-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                     yolo_fire = True
-        # Only trigger fire if BOTH methods agree
-        fire_detected = color_motion_fire and yolo_fire
+        # Trigger fire if color+motion suggests fire OR YOLO (non-person) box has fire color
+        # (YOLO COCO has no "fire" class, so requiring both missed real fire; either signal is enough)
+        fire_detected = color_motion_fire or yolo_fire
         status = "Fire Detected!" if fire_detected else "No Fire"
         color = (0, 0, 255) if fire_detected else (0, 255, 0)
         cv2.putText(annotated_frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
