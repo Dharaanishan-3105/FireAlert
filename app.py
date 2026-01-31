@@ -75,18 +75,22 @@ def main():
         def video_frame_callback(frame):
             img = frame.to_ndarray(format="bgr24")
             fire_detected, annotated = run_detection(img, detector)
-            if fire_detected:
-                try:
+            try:
+                if fire_detected:
                     with open(_trigger_file, "w") as f:
                         f.write(str(time.time()))
-                except Exception:
-                    pass
-                if email_config:
-                    if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
-                        detector.email_sender = email_config["sender"]
-                        detector.email_password = email_config["password"]
-                        detector.email_recipient = email_config["recipient"]
-                        detector.send_email_alert(annotated)
+                    if email_config:
+                        if (time.time() - getattr(detector, "last_email_time", 0)) >= detector.email_cooldown:
+                            detector.email_sender = email_config["sender"]
+                            detector.email_password = email_config["password"]
+                            detector.email_recipient = email_config["recipient"]
+                            detector.send_email_alert(annotated)
+                else:
+                    # No fire: clear trigger so main app stops the alarm
+                    if os.path.exists(_trigger_file):
+                        os.remove(_trigger_file)
+            except Exception:
+                pass
             return av.VideoFrame.from_ndarray(annotated, format="bgr24")
 
         webrtc_streamer(
@@ -96,31 +100,35 @@ def main():
             rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         )
 
-        # Poll trigger file and play alarm automatically when fire was detected (callback runs in worker)
+        # Poll trigger: play alarm only while fire is detected; stop as soon as no fire (prestigious, proper behavior)
         @st.fragment(run_every=timedelta(seconds=1))
         def fire_alert_auto():
             try:
                 if os.path.exists(_trigger_file):
                     with open(_trigger_file, "r") as f:
                         t = float(f.read().strip() or 0)
-                    if t and (time.time() - t) < 10:
-                        st.error("🚨 **Fire detected!** — Alarm playing.")
+                    if t and (time.time() - t) < 15:
+                        st.error("🚨 **Fire detected!** — Alarm on.")
                         if os.path.exists(alarm_path):
-                            # Embed audio and force play via JS so alarm actually plays (st.audio autoplay is often blocked)
                             with open(alarm_path, "rb") as f:
                                 b64 = __import__("base64").b64encode(f.read()).decode()
+                            # Play (loop) while fire; callback clears trigger when no fire so alarm stops
                             audio_html = f'''<audio id="firealarm" preload="auto"><source src="data:audio/mp3;base64,{b64}" type="audio/mpeg"></audio><script>(function(){{var a=document.getElementById("firealarm");if(a){{a.volume=1;a.loop=true;a.play().catch(function(){{}});}}}})();</script>'''
                             try:
                                 st.html(audio_html, unsafe_allow_javascript=True)
                             except TypeError:
-                                st.components.v1.html(f'<audio autoplay loop><source src="data:audio/mp3;base64,{b64}" type="audio/mpeg"></audio>', height=0)
+                                st.components.v1.html(f'<audio id="firealarm" autoplay loop><source src="data:audio/mp3;base64,{b64}" type="audio/mpeg"></audio>', height=0)
                             st.audio(alarm_path, format="audio/mp3", key=f"fire_alarm_{int(t)}")
-                            st.caption("If no sound, tap **Play** above once (some browsers block auto-play until you tap).")
                         return
+                # No fire: stop any playing alarm
+                stop_html = '''<script>(function(){var a=document.getElementById("firealarm");if(a){a.pause();a.currentTime=0;}})();</script>'''
+                try:
+                    st.html(stop_html, unsafe_allow_javascript=True)
+                except TypeError:
+                    pass
             except Exception:
                 pass
-            if os.path.exists(alarm_path):
-                st.caption("Alarm will play automatically when fire is detected on the video.")
+            st.success("✅ **No fire** — System clear. Alarm will sound only when fire is detected.")
 
         fire_alert_auto()
 
